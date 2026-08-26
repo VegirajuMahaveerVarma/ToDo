@@ -12,6 +12,7 @@ A premium offline-first Flutter productivity app with a distinctive future-produ
 - Premium dark mode
 - SharedPreferences persistence
 - Fully offline: no Firebase, backend, or APIs
+- Cloud APK build via GitHub Actions
 
 ## Run
 
