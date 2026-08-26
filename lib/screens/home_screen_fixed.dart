@@ -1,0 +1,158 @@
+import 'package:flutter/material.dart';
+import '../models/task.dart';
+import '../services/storage_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/productivity_ring.dart';
+import '../widgets/task_item.dart';
+import '../widgets/upcoming_timeline.dart';
+import '../widgets/floating_add_button.dart';
+import 'add_task_screen.dart';
+import 'settings_screen.dart';
+import 'task_details_screen.dart';
+
+class HomeScreenFixed extends StatefulWidget {
+  final bool dark;
+  final ValueChanged<bool> onDark;
+  const HomeScreenFixed({super.key, required this.dark, required this.onDark});
+  @override State<HomeScreenFixed> createState() => _HomeScreenFixedState();
+}
+
+class _HomeScreenFixedState extends State<HomeScreenFixed> {
+  final store = StorageService();
+  List<Task> tasks = [];
+  String filter = 'All';
+  bool loading = true;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    tasks = await store.loadTasks();
+    if (tasks.isEmpty) {
+      tasks = [
+        Task(id: 'demo1', title: 'Plan the week', priority: TaskPriority.high, category: TaskCategory.goals, dueDate: DateTime.now().add(const Duration(hours: 2))),
+        Task(id: 'demo2', title: 'Machine Learning revision', category: TaskCategory.study, dueDate: DateTime.now().add(const Duration(days: 1))),
+        Task(id: 'demo3', title: 'Sketch app ideas', category: TaskCategory.ideas, completed: true),
+      ];
+    }
+    setState(() => loading = false);
+  }
+
+  Future<void> _save() => store.saveTasks(tasks);
+
+  List<Task> get shown {
+    final now = DateTime.now();
+    return tasks.where((t) {
+      switch (filter) {
+        case 'Today': return t.dueDate != null && t.dueDate!.year == now.year && t.dueDate!.month == now.month && t.dueDate!.day == now.day;
+        case 'Upcoming': return t.dueDate != null && !t.completed;
+        case 'Completed': return t.completed;
+        case 'High Priority': return t.priority == TaskPriority.high;
+        default: return true;
+      }
+    }).toList();
+  }
+
+  void toggle(Task t) { setState(() => t.completed = !t.completed); _save(); }
+
+  Future<void> add() async {
+    final t = await Navigator.push<Task>(context, MaterialPageRoute(builder: (_) => const AddTaskScreen()));
+    if (t != null) { setState(() => tasks.insert(0, t)); _save(); }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final done = tasks.where((t) => t.completed).length;
+    final upcoming = tasks.where((t) => t.dueDate != null && !t.completed).toList()..sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
+    return Scaffold(
+      body: SafeArea(
+        child: loading ? const Center(child: CircularProgressIndicator()) : CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(22, 24, 22, 110),
+              sliver: SliverList(delegate: SliverChildListDelegate([
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(_greeting(), style: const TextStyle(fontSize: 27, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 5),
+                    Text("Let's make today count.", style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  ]),
+                  IconButton(onPressed: () => showSearch(context: context, delegate: _TaskSearch(tasks)), icon: const Icon(Icons.search_rounded, size: 28)),
+                ]),
+                const SizedBox(height: 25),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(32), gradient: LinearGradient(colors: [AppTheme.accent.withValues(alpha: .20), AppTheme.cyan.withValues(alpha: .08)])),
+                  child: Row(children: [
+                    ProductivityRing(progress: tasks.isEmpty ? 0 : done / tasks.length),
+                    const SizedBox(width: 14),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('YOUR MOMENTUM', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.5)),
+                      const SizedBox(height: 8),
+                      Text(done == tasks.length ? "You're all caught up ✨" : 'Keep the flow going.', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 7),
+                      Text('$done done • ${tasks.length - done} left', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    ])),
+                  ]),
+                ),
+                const SizedBox(height: 28),
+                _stats(done),
+                const SizedBox(height: 28),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  const Text("Today's Focus", style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
+                  TextButton(onPressed: () => setState(() => filter = filter == 'All' ? 'Today' : 'All'), child: Text(filter == 'All' ? 'Today' : 'All')),
+                ]),
+                const SizedBox(height: 8),
+                Wrap(spacing: 7, children: ['All', 'Today', 'Upcoming', 'Completed', 'High Priority'].map((f) => ChoiceChip(label: Text(f), selected: filter == f, onSelected: (_) => setState(() => filter = f))).toList()),
+                const SizedBox(height: 14),
+                if (shown.isEmpty) _empty(),
+                if (shown.isNotEmpty) ...shown.take(8).map((t) => TaskItem(task: t, onComplete: () => toggle(t), onDelete: () { setState(() => tasks.remove(t)); _save(); }, onTap: () async { final r = await Navigator.push<Task>(context, MaterialPageRoute(builder: (_) => TaskDetailsScreen(task: t))); if (r != null) { setState(() {}); _save(); } })),
+                if (upcoming.isNotEmpty) ...[
+                  const SizedBox(height: 28),
+                  const Text('Upcoming', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 12),
+                  UpcomingTimeline(tasks: upcoming.take(5).toList()),
+                ],
+                const SizedBox(height: 24),
+                Center(child: Text('Developed by Maha', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant))),
+              ])),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingAddButton(onPressed: add),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: 0,
+        onDestinationSelected: (i) {
+          if (i == 1) {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => SettingsScreen(dark: widget.dark, onDark: widget.onDark, clearCompleted: () { setState(() => tasks.removeWhere((t) => t.completed)); _save(); }, reset: () async { setState(() => tasks.clear()); await store.clear(); })));
+          }
+        },
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.space_dashboard_outlined), selectedIcon: Icon(Icons.space_dashboard), label: 'Focus'),
+          NavigationDestination(icon: Icon(Icons.tune_rounded), label: 'Settings'),
+        ],
+      ),
+    );
+  }
+
+  String _greeting() {
+    final h = DateTime.now().hour;
+    return h < 12 ? 'Good morning, Maha 👋' : h < 17 ? 'Good afternoon, Maha 👋' : 'Good evening, Maha 👋';
+  }
+
+  Widget _stats(int done) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [_stat('TODAY', '${tasks.length}'), _stat('DONE', '$done'), _stat('LEFT', '${tasks.length - done}'), _stat('STREAK', '7d')]);
+  Widget _stat(String a, String b) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(a, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.onSurfaceVariant, letterSpacing: 1.1)), const SizedBox(height: 5), Text(b, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800))]);
+  Widget _empty() => Padding(padding: const EdgeInsets.symmetric(vertical: 55), child: Column(children: [Icon(Icons.auto_awesome_rounded, size: 54, color: AppTheme.accent.withValues(alpha: .8)), const SizedBox(height: 16), const Text("You're all caught up ✨", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)), const SizedBox(height: 6), Text('Enjoy the moment or add something new.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))]));
+}
+
+class _TaskSearch extends SearchDelegate<Task?> {
+  final List<Task> tasks;
+  _TaskSearch(this.tasks);
+  @override List<Widget>? buildActions(BuildContext c) => [IconButton(onPressed: () => query = '', icon: const Icon(Icons.clear))];
+  @override Widget? buildLeading(BuildContext c) => IconButton(onPressed: () => close(c, null), icon: const Icon(Icons.arrow_back));
+  @override Widget buildResults(BuildContext c) => _results();
+  @override Widget buildSuggestions(BuildContext c) => _results();
+  Widget _results() => ListView(children: tasks.where((t) => t.title.toLowerCase().contains(query.toLowerCase())).map((t) => ListTile(title: Text(t.title), subtitle: Text(t.category.name), onTap: () => close(context, t))).toList());
+}
