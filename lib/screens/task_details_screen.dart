@@ -2,5 +2,41 @@ import 'package:flutter/material.dart';
 import '../models/task.dart';
 import 'add_task_screen.dart';
 
-class TaskDetailsScreen extends StatelessWidget { final Task task; const TaskDetailsScreen({super.key,required this.task}); @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Focus detail'),actions:[IconButton(icon:const Icon(Icons.edit_outlined),onPressed:()async{final t=await Navigator.push<Task>(context,MaterialPageRoute(builder:(_)=>AddTaskScreen(task:task)));if(t!=null && context.mounted)Navigator.pop(context,t);})]),body:Padding(padding:const EdgeInsets.all(24),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(task.title,style:const TextStyle(fontSize:32,fontWeight:FontWeight.w800)),const SizedBox(height:16),Text(task.description.isEmpty?'No description yet.':task.description,style:TextStyle(fontSize:16,color:Theme.of(context).colorScheme.onSurfaceVariant)),const SizedBox(height:30),Text('CATEGORY  ${task.category.name.toUpperCase()}'),const SizedBox(height:10),Text('PRIORITY  ${task.priority.name.toUpperCase()}'),if(task.dueDate!=null)Padding(padding:const EdgeInsets.only(top:10),child:Text('DUE  ${task.dueDate}'))])); }
+class TaskDetailsScreen extends StatelessWidget {
+  final Task task;
+  const TaskDetailsScreen({super.key, required this.task});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Focus detail'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () async {
+              final t = await Navigator.push<Task>(context, MaterialPageRoute(builder: (_) => AddTaskScreen(task: task)));
+              if (t != null && context.mounted) Navigator.pop(context, t);
+            },
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(task.title, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 16),
+          Text(task.description.isEmpty ? 'No description yet.' : task.description, style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 30),
+          Text('CATEGORY  ${task.category.name.toUpperCase()}'),
+          const SizedBox(height: 10),
+          Text('PRIORITY  ${task.priority.name.toUpperCase()}'),
+          if (task.dueDate != null) ...[
+            const SizedBox(height: 10),
+            Text('DUE  ${task.dueDate}'),
+          ],
+        ]),
+      ),
+    );
+  }
 }
